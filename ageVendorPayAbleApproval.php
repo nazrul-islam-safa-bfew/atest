@@ -245,10 +245,16 @@ if($pcode=='') $pcode='%';
 		 
 		 td.invoiceList{vertical-align:bottom;}
 		 a.pdf_class img {
-					width: 16px;
+					width: 10px;
 			}
 		 .verifyClass{
-background: #077900;color: #fff !important;display: inline-block;padding: 1px;border-radius: 5px; font-size: 12px; margin-top:2px;
+			background: #077900;
+    color: #fff !important;
+    /* display: inline-block; */
+    /* padding: 1px; */
+    border-radius: 5px;
+    /* font-size: 12px; */
+    margin-top: 2px;
 			}
 		 .verifyBTN{
 			 margin-left:5px;
@@ -471,7 +477,7 @@ if($item_receiving_completation==1){
 	?>
 
    
- <br>PO Amount: <? echo  number_format(poTotalAmount($mr[posl]),2).' dated '.mydate($mr[activeDate]); ?>
+ <br>PO Amount: <? echo  number_format(poTotalAmount($mr[posl]),2).' date '.mydate($mr[activeDate]); ?>
  <br>
 <?
 	if($poType!=2){
@@ -507,9 +513,11 @@ $totalPoPaidAmount=$poPaidAmount=poPaidAmount($posl);
 $total_invoice_count = countPoSchedule_invoice($posl);
 $i=1;
 $invoice_amount_array = invoice_amount_by_posl($posl);
+
 // print_r($invoice_amount_array);
 	//advance info
 	$poAdvanceArr=getPOadvanceinfo($posl);
+	$poRetentionArr=getPORetentionMoneyInfo($posl);
 	$advancePayableAmount=$poAdvanceArr["amount"]-$totalPoPaidAmount;
 	// print_r($poAdvanceArr);
 	if($poAdvanceArr["parcent"]>0){
@@ -519,14 +527,16 @@ $invoice_amount_array = invoice_amount_by_posl($posl);
 
 		if($poPaidAmount>=$poAdvanceArr["amount"]){
 			$poPaidAmount-=$poAdvanceArr["amount"]; //remove advance amount from po paid amount
-			$current_invoice_adv_adj_amount = invoice_per_month_amount_by_posl($posl,$poPaidAmount,$poAdvanceArr["amount"]);
-			$poPaidAmount+=$current_invoice_adv_adj_amount;
+			// $current_invoice_adv_adj_amount = invoice_per_month_amount_by_posl($posl,$poPaidAmount,$poAdvanceArr["amount"]);
+			// $poPaidAmount+=$current_invoice_adv_adj_amount;
 		}
-		
+		// echo "poPaidAmount = $poPaidAmount";
 		//echo "<p>Advance <font color='#00f'>$poAdvanceParcent%</font>: Raised on <span>$visualDate</span></p>";
-		echo "<p>Inv $i: Adv <span>$visualDate</span></p>";
+		echo "<p>Inv $i: Adv <span>$visualDate</span>";
 
-
+		vendorpayable_approved_function($posl,$visualDate,$mr,$location);
+		echo "</p>";
+		
 		$posl = $mr['posl'];
 		$typell=is_po_closed($posl);
 		if($typell)$flag=1;
@@ -591,6 +601,7 @@ while($typel2=mysqli_fetch_array($sqlrunp1)){
 		//  }
 //po check end
 
+  $totalRecieive_remaining = totalReceiveA($poType,$posl,$project);
   $old_InvoiceDiff = $InvoiceDiff=(strtotime($todat)-strtotime($edate))/86400;
 //   echo "$InvoiceDiff = (strtotime($todat)-strtotime($edate))";
 	if($poType==1 || $poType==3){
@@ -600,7 +611,14 @@ while($typel2=mysqli_fetch_array($sqlrunp1)){
 		
 		// echo "$poType poType";
 		// print_r($itemPOArray);
-		$current_invoice_adv_adj_amount = invoice_per_month_amount_by_posl($posl,$invoice_amount_array[$i-$is_advance_activated-1],$poAdvanceArr["amount"]);
+		$current_invoice_adv_adj_amount = invoice_adv_amount_by_amount_n_parcent($invoice_amount_array[$i-$is_advance_activated-1],$poAdvanceArr["parcent"]);
+
+
+		$invoiceActualAmount = $invoice_amount_array[$i-$is_advance_activated-1];
+
+		// echo " >>current_invoice_adv_adj_amount: $current_invoice_adv_adj_amount >> invoiceActualAmount = $invoiceActualAmount";
+		// dd($invoice_amount_array);
+
 
 		foreach($itemPOArray as $itemPOa){
 			$invoiceAmount+=$itemPOa[1];
@@ -608,11 +626,7 @@ while($typel2=mysqli_fetch_array($sqlrunp1)){
 		}
 		unset($itemPOArray);
 
-
-		$totalRecieive = totalReceiveA($poType,$posl,$project);
-		if($totalRecieive>=($totalInvoiceAmount+$invoiceActualAmount)){
-			$invoiceActualAmount=$invoice_amount_array[$i-$is_advance_activated-1];//-$current_invoice_adv_adj_amount;//round(floatval($invoiceAmount),2);
-		}
+	
 		// print_r($invoiceActualAmount);
 		
 		
@@ -620,17 +634,42 @@ while($typel2=mysqli_fetch_array($sqlrunp1)){
 		if($poIsClosedQty>0 && $poType==1)
 			$itemCodeAmount+=po_mat_receive($itemCode,$posl,$location);
 
-		
 
-			// echo "$poPaidAmount>=$invoiceActualAmount";
+			
 
-if($poPaidAmount>0){
-	if($invoiceActualAmount>0){
-		// with advance	
-		if( $poPaidAmount>=$invoiceActualAmount) {$poPaidAmount-=$invoiceActualAmount;$invoiceActualAmount=0;}
-		 else{$invoiceActualAmount-=$poPaidAmount;$poPaidAmount=0;}
-	}
-}
+			if($poPaidAmount>0){
+				if($invoiceActualAmount>0){
+					
+					// with advance	
+					if( $poPaidAmount>=$invoiceActualAmount) {
+						$poPaidAmount-=$invoiceActualAmount;
+						$invoiceActualAmount=0;
+						
+					}else{
+				
+						$invoiceActualAmount-=$poPaidAmount;
+						$poPaidAmount=0;
+						// echo "invoiceActualAmount=$invoiceActualAmount-=poPaidAmount=$poPaidAmount";
+					}
+				}
+			}
+			
+			
+
+			//echo $invoiceActualAmount;
+
+			// echo "totalRecieive_remaining = $totalRecieive_remaining";
+			if($totalRecieive_remaining>=($totalInvoiceAmount+$invoiceActualAmount)){
+				
+			}else{
+				$invoiceActualAmount=0;
+			}
+			$totalRecieive_remaining-=$invoiceActualAmount;
+			
+			
+
+			// echo "poPaidAmount=$poPaidAmount>=$invoiceActualAmount";
+
 // echo "$poPaidAmount>=$invoiceActualAmount";
 
 
@@ -639,21 +678,43 @@ if($old_InvoiceDiff<0)$invoiceActualAmount=0;
 // echo "invoiceActualAmount = $invoiceActualAmount. >> << ";
 $old_invoiceActualAmount = $invoiceActualAmount;
 
-if($poAdvanceParcent>0){
-	$number_of_invoice = countPoSchedule_invoice($posl);
-	$current_invoice_payable=$poAdvanceParcent>0 ? pOAdvanceAdjustment($invoiceActualAmount,$poAdvanceParcent,$poAdvanceArr["amount"],$typel2[advanceType],null,($i-$is_advance_activated /* return the real invoice number */),$number_of_invoice,$current_invoice_adv_adj_amount) : 0; //advance adjustment
+
+
+if(is_advance_amount_paid($poPaidAmount,$poAdvanceArr["amount"])){
+	$old_invoiceActualAmount=$invoiceActualAmount=$current_invoice_payable=0;
+}
+elseif($poAdvanceParcent>0){
+	$current_invoice_payable=$poAdvanceParcent>0 ? pOAdvanceAdjustment($invoiceActualAmount,$poAdvanceParcent,$poAdvanceArr["amount"],$current_invoice_adv_adj_amount) : 0; //advance adjustment
 	$invoiceActualAmount=$current_invoice_payable;
 	// echo "advance adjustment $poAdvanceParcent";
 }
+elseif($poRetentionArr["retention_money_percent"]>0){
+	$retention_deducted_amount=$poAdvanceParcent>0 ? pORetentionMoneyAdjustment($posl,$old_invoiceActualAmount) : 0; //retention adjustment
+	$current_invoice_payable=$invoiceActualAmount-=$retention_deducted_amount;
+	// echo "advance adjustment $poAdvanceParcent";
+}
+
+
+
+
 
 $totalInvoiceAmount+=$invoiceActualAmount; //total amount collection
 
 
-echo "<p>Inv $i: Rng <span>$visualDate</span>";
+$popup = "<table border=1>";
+$popup.="<tr><td>Invoice Amount: </td><td align=right>".number_format($invoice_amount_array[$i-$is_advance_activated-1],2)."</td></tr>";
+$popup.="<tr><td>Advance Adjustment: </td><td align=right>".number_format($current_invoice_adv_adj_amount,2)."</td></tr>";
+$popup.="<tr><td>Retention Adjustment: </td><td align=right>".number_format($retention_deducted_amount,2)."</td></tr>";
+$popup.="<tr><td>Sub total Amount: </td><td align=right>".number_format($invoice_amount_array[$i-$is_advance_activated-1]-$current_invoice_adv_adj_amount-$retention_deducted_amount,2)."</td></tr>";
+$popup .= "</table>";
+
+
+echo "<p onclick='var tt=window.open(\"\",\"\",\"width=400,height=400\");tt.document.write(\"$popup\");'>Inv $i: Rng <span>$visualDate</span>";
 		
+	 
 		
-		
-vendorpayable_approved_function($posl,$indate,$mr,$location);
+//vendorpayable_approved_function($posl,$indate,$mr,$location);
+vendorpayable_approved_function($posl,$visualDate,$mr,$location);
 		
 		
 		
@@ -693,7 +754,9 @@ $st6.=$blankRowData;$st5.=$blankRowData;$st4.=$blankRowData;$st3.=$blankRowData;
 	    else {$st1.=$RowData;
 $st6.=$blankRowData;$st5.=$blankRowData;$st4.=$blankRowData;$st3.=$blankRowData;$st2.=$blankRowData;}
 
-	}elseif($poType==2){
+}
+	
+	elseif($poType==2){
 		if($poIsClosedQty>0)
 			$itemCodeAmount+=eqpoActualReceiveAmountItemCode($posl,$itemCode);
 		
@@ -722,7 +785,9 @@ $invoiceActualAmount=$current_invoice_payable;
 		// echo "advance adjustment $poAdvanceParcent";
 
 $totalInvoiceAmount+=$invoiceActualAmount; //total amount collection
-vendorpayable_approved_function($posl,$indate,$mr,$location);
+
+//vendorpayable_approved_function($posl,$indate,$mr,$location);
+vendorpayable_approved_function($posl,$visualDate,$mr,$location);
 
 			$formatedInvoiceActualAmount=number_format($invoiceActualAmount,2);
 			if($invoiceActualAmount>0){
@@ -770,6 +835,51 @@ $st6.=$blankRowData;$st5.=$blankRowData;$st4.=$blankRowData;$st3.=$blankRowData;
 	$closingAmount=$actualPoAmount-$totalPoPaidAmount-$poAdvanceArr["amount"];
 	$FinalAmount=($closingAmount) > 0 ? $closingAmount : "<font color='#f00'>($closingAmount)</font>";
 }
+
+
+// ============================================================================ retention invoice
+if($poRetentionArr["retention_money_percent"]>0){
+	$i++;
+	$InvoiceDiff=(strtotime($todat)-strtotime($mr[activeDate]))/86400;
+	$visualDate=mydate($mr[activeDate]);
+	$poRetParcent=$poRetentionArr[retention_money_percent];
+
+
+	// ========== retention for final invoice
+	// echo "$indate<$todat";
+	if($poRetentionArr["retention_money_chk"]>0 && $indate<$todat){
+		
+	}
+
+	// ========= retention for final invoice end
+	if($poPaidAmount>=$poAdvanceArr["amount"]){
+		$poPaidAmount-=$poAdvanceArr["amount"]; //remove advance amount from po paid amount
+		$current_invoice_adv_adj_amount = invoice_per_month_amount_by_posl($posl,$poPaidAmount,$poAdvanceArr["amount"]);
+		$poPaidAmount+=$current_invoice_adv_adj_amount;
+	}
+
+
+	$TotalRetentionMoney = TotalRetentionMoney($posl,total_po_amount_by_posl($posl));
+	
+	echo "<p>Inv $i: Rtn <span>$visualDate</span></p>";
+	$TotalRetentionMoney=number_format($TotalRetentionMoney,2);
+
+	$RowData=$TotalRetentionMoney>0 ? "<p><font color='#00f'>$TotalRetentionMoney</font></p>" : "<p>&nbsp;0.00</p>";
+	
+if($InvoiceDiff>=91) {$st6.=$RowData;	$st5.=$blankRowData;$st4.=$blankRowData;$st3.=$blankRowData;$st2.=$blankRowData;$st1.=$blankRowData;}
+elseif($InvoiceDiff>=61) {$st5.=$RowData;
+$st6.=$blankRowData;$st4.=$blankRowData;$st3.=$blankRowData;$st2.=$blankRowData;$st1.=$blankRowData;}
+elseif($InvoiceDiff>=31) {$st4.=$RowData;
+$st6.=$blankRowData;$st5.=$blankRowData;$st3.=$blankRowData;$st2.=$blankRowData;$st1.=$blankRowData;}
+elseif($InvoiceDiff>=16) {$st3.=$RowData;
+$st6.=$blankRowData;$st5.=$blankRowData;$st4.=$blankRowData;$st2.=$blankRowData;$st1.=$blankRowData;}
+  elseif($InvoiceDiff>=8) {$st2.=$RowData;
+$st6.=$blankRowData;$st5.=$blankRowData;$st4.=$blankRowData;$st3.=$blankRowData;$st1.=$blankRowData;}
+	else {$st1.=$RowData;
+$st6.=$blankRowData;$st5.=$blankRowData;$st4.=$blankRowData;$st3.=$blankRowData;$st2.=$blankRowData;}
+}
+//retention invoice end
+
 ?>
 </div>
 	</td>
