@@ -699,7 +699,6 @@ $old_invoiceActualAmount = $invoiceActualAmount;
 
 
 
-
 if(is_advance_amount_paid($poPaidAmount,$poAdvanceArr["amount"])){
 	$old_invoiceActualAmount=$invoiceActualAmount=$current_invoice_payable=0;
 }
