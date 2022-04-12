@@ -270,6 +270,12 @@ if($pcode=='') $pcode='%';
     font-weight: 800;
     margin-right: 10px !important;
 		 }
+
+		 .date-hover{}
+		 .date-hover:hover{
+			 background: #00f;
+			 color:#fff;
+		 }
 	 </style>
 
 <? 
@@ -532,7 +538,18 @@ $invoice_amount_array = invoice_amount_by_posl($posl);
 		}
 		// echo "poPaidAmount = $poPaidAmount";
 		//echo "<p>Advance <font color='#00f'>$poAdvanceParcent%</font>: Raised on <span>$visualDate</span></p>";
-		echo "<p>Inv $i: Adv <span>$visualDate</span>";
+
+
+
+		$popup = "<table border=1>";
+		$popup.="<tr><td>Invoice Amount: </td><td align=right>".number_format($poAdvanceArr["amount"],2)."</td></tr>";
+		$popup.="<tr><td>Advance Paid Amount: </td><td align=right>".number_format(($totalPoPaidAmount>$poAdvanceArr["amount"] ? $poAdvanceArr["amount"] : $totalPoPaidAmount),2)."</td></tr>";
+		$popup.="<tr><td>Payable amount: </td><td align=right>".number_format(($poAdvanceArr["amount"]-$totalPoPaidAmount>0 ? $poAdvanceArr["amount"]-$totalPoPaidAmount : 0),2)."</td></tr>";
+		$popup .= "</table>";
+
+
+
+		echo "<p>Inv $i: Adv <span onclick='var tt=window.open(\"\",\"\",\"width=400,height=400\");tt.document.write(\"$popup\");' style='cursor:pointer;' class='date-hover'>$visualDate</span>";
 
 		vendorpayable_approved_function($posl,$visualDate,$mr,$location);
 		echo "</p>";
@@ -636,18 +653,20 @@ while($typel2=mysqli_fetch_array($sqlrunp1)){
 
 
 			
-
+			$poPaidAmount_adjustment = 0;
 			if($poPaidAmount>0){
 				if($invoiceActualAmount>0){
 					
 					// with advance	
 					if( $poPaidAmount>=$invoiceActualAmount) {
 						$poPaidAmount-=$invoiceActualAmount;
+						$poPaidAmount_adjustment = $invoiceActualAmount;
 						$invoiceActualAmount=0;
 						
 					}else{
 				
 						$invoiceActualAmount-=$poPaidAmount;
+						$poPaidAmount_adjustment = $poPaidAmount;
 						$poPaidAmount=0;
 						// echo "invoiceActualAmount=$invoiceActualAmount-=poPaidAmount=$poPaidAmount";
 					}
@@ -680,13 +699,14 @@ $old_invoiceActualAmount = $invoiceActualAmount;
 
 
 
+
 if(is_advance_amount_paid($poPaidAmount,$poAdvanceArr["amount"])){
 	$old_invoiceActualAmount=$invoiceActualAmount=$current_invoice_payable=0;
 }
 elseif($poAdvanceParcent>0){
-	$current_invoice_payable=$poAdvanceParcent>0 ? pOAdvanceAdjustment($invoiceActualAmount,$poAdvanceParcent,$poAdvanceArr["amount"],$current_invoice_adv_adj_amount) : 0; //advance adjustment
+	$current_invoice_payable=$poAdvanceParcent>0 ? pOAdvanceAdjustment($invoiceActualAmount,$poAdvanceParcent,$current_invoice_adv_adj_amount) : 0; //advance adjustment
 	$invoiceActualAmount=$current_invoice_payable;
-	// echo "advance adjustment $poAdvanceParcent";
+	// echo "advance adjustment current_invoice_payable = $current_invoice_payable >> current_invoice_adv_adj_amount = $current_invoice_adv_adj_amount";
 }
 elseif($poRetentionArr["retention_money_percent"]>0){
 	$retention_deducted_amount=$poAdvanceParcent>0 ? pORetentionMoneyAdjustment($posl,$old_invoiceActualAmount) : 0; //retention adjustment
@@ -705,18 +725,22 @@ $popup = "<table border=1>";
 $popup.="<tr><td>Invoice Amount: </td><td align=right>".number_format($invoice_amount_array[$i-$is_advance_activated-1],2)."</td></tr>";
 $popup.="<tr><td>Advance Adjustment: </td><td align=right>".number_format($current_invoice_adv_adj_amount,2)."</td></tr>";
 $popup.="<tr><td>Retention Adjustment: </td><td align=right>".number_format($retention_deducted_amount,2)."</td></tr>";
-$popup.="<tr><td>Sub total Amount: </td><td align=right>".number_format($invoice_amount_array[$i-$is_advance_activated-1]-$current_invoice_adv_adj_amount-$retention_deducted_amount,2)."</td></tr>";
+$popup.="<tr><td>Pre-Paid Adjustment: </td><td align=right>".number_format($poPaidAmount_adjustment,2)."</td></tr>";
+$popup.="<tr><td>Sub total Amount: </td><td align=right>".number_format($invoice_amount_array[$i-$is_advance_activated-1]-$current_invoice_adv_adj_amount-$retention_deducted_amount-$poPaidAmount_adjustment,2)."</td></tr>";
 $popup .= "</table>";
 
 
-echo "<p onclick='var tt=window.open(\"\",\"\",\"width=400,height=400\");tt.document.write(\"$popup\");'>Inv $i: Rng <span>$visualDate</span>";
+echo "<p>Inv $i: Rng <span onclick='var tt=window.open(\"\",\"\",\"width=400,height=400\");tt.document.write(\"$popup\");' style='cursor:pointer;' class='date-hover'>$visualDate</span>";
 		
 	 
 		
 //vendorpayable_approved_function($posl,$indate,$mr,$location);
 vendorpayable_approved_function($posl,$visualDate,$mr,$location);
 		
-		
+	
+if(!is_vendor_payable_approved($posl,$visualDate)){
+	$invoiceActualAmount = 0;
+}	
 		
 $formatedInvoiceActualAmount=number_format($invoiceActualAmount,2);
 		
@@ -788,6 +812,7 @@ $totalInvoiceAmount+=$invoiceActualAmount; //total amount collection
 
 //vendorpayable_approved_function($posl,$indate,$mr,$location);
 vendorpayable_approved_function($posl,$visualDate,$mr,$location);
+
 
 			$formatedInvoiceActualAmount=number_format($invoiceActualAmount,2);
 			if($invoiceActualAmount>0){
